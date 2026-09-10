@@ -1,0 +1,737 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>Circuit // Snake</title>
+<style>
+  :root{
+    --bg-0:#0b0f14;
+    --bg-1:#101720;
+    --grid-line:#182430;
+    --snake-head:#5ff7d0;
+    --snake-body:#2fd7ae;
+    --food:#ff6b5b;
+    --food-glow:#ff9b8a;
+    --ink:#dbe7ef;
+    --ink-dim:#6f8496;
+    --accent:#5ff7d0;
+    --danger:#ff6b5b;
+    --panel:#0e1620;
+    --panel-border:#1c2b38;
+  }
+  *{box-sizing:border-box;}
+  html,body{
+    margin:0; padding:0; height:100%;
+    background:
+      radial-gradient(circle at 50% -10%, #10202a 0%, var(--bg-0) 55%);
+    color:var(--ink);
+    font-family:'Courier New', ui-monospace, 'SF Mono', Menlo, monospace;
+    overflow:hidden;
+    -webkit-tap-highlight-color:transparent;
+  }
+  .wrap{
+    height:100%;
+    display:flex;
+    flex-direction:column;
+    align-items:center;
+    justify-content:center;
+    padding:16px;
+    gap:14px;
+  }
+  .hud{
+    width:min(92vw, 560px);
+    display:flex;
+    justify-content:space-between;
+    align-items:flex-end;
+    font-size:12px;
+    letter-spacing:0.12em;
+    text-transform:uppercase;
+    color:var(--ink-dim);
+  }
+  .hud .title{
+    font-size:15px;
+    color:var(--ink);
+    letter-spacing:0.2em;
+  }
+  .hud .title span{ color:var(--accent); }
+  .stat-block{ text-align:right; }
+  .stat-block .num{
+    font-size:20px;
+    color:var(--ink);
+    letter-spacing:0.05em;
+  }
+  .stat-block .num.best{ color:var(--accent); }
+
+  .board-frame{
+    position:relative;
+    width:min(92vw, 560px);
+    aspect-ratio:1/1;
+    background:var(--bg-1);
+    border:1px solid var(--panel-border);
+    border-radius:10px;
+    box-shadow:
+      0 0 0 1px rgba(95,247,208,0.04),
+      0 20px 60px -20px rgba(0,0,0,0.7),
+      inset 0 0 40px rgba(95,247,208,0.03);
+    overflow:hidden;
+  }
+  canvas{
+    display:block;
+    width:100%;
+    height:100%;
+  }
+
+  .overlay{
+    position:absolute;
+    inset:0;
+    display:flex;
+    flex-direction:column;
+    align-items:center;
+    justify-content:center;
+    gap:16px;
+    background:rgba(11,15,20,0.86);
+    backdrop-filter:blur(2px);
+    text-align:center;
+    padding:24px;
+  }
+  .overlay.hidden{ display:none; }
+  .overlay h1{
+    margin:0;
+    font-size:26px;
+    letter-spacing:0.14em;
+    color:var(--ink);
+    text-transform:uppercase;
+  }
+  .overlay h1 span{ color:var(--accent); }
+  .overlay p{
+    margin:0;
+    color:var(--ink-dim);
+    font-size:13px;
+    max-width:340px;
+    line-height:1.6;
+    letter-spacing:0.02em;
+  }
+  .overlay .score-line{
+    color:var(--ink);
+    font-size:14px;
+    letter-spacing:0.08em;
+  }
+  .overlay .score-line b{ color:var(--danger); font-size:22px; }
+
+  .btn{
+    appearance:none;
+    border:1px solid var(--accent);
+    background:transparent;
+    color:var(--accent);
+    padding:11px 26px;
+    font-family:inherit;
+    font-size:13px;
+    letter-spacing:0.14em;
+    text-transform:uppercase;
+    border-radius:6px;
+    cursor:pointer;
+    transition:background 0.15s ease, color 0.15s ease, box-shadow 0.15s ease;
+  }
+  .btn:hover, .btn:focus-visible{
+    background:var(--accent);
+    color:#06110e;
+    box-shadow:0 0 24px rgba(95,247,208,0.35);
+    outline:none;
+  }
+  .btn:active{ transform:translateY(1px); }
+
+  .kbd-row{
+    display:flex;
+    gap:6px;
+    margin-top:4px;
+    flex-wrap:wrap;
+    justify-content:center;
+  }
+  .kbd{
+    border:1px solid var(--panel-border);
+    color:var(--ink-dim);
+    padding:3px 8px;
+    border-radius:4px;
+    font-size:11px;
+    letter-spacing:0.05em;
+  }
+
+  .pause-tag{
+    position:absolute;
+    top:10px; left:50%;
+    transform:translateX(-50%);
+    font-size:11px;
+    letter-spacing:0.2em;
+    color:var(--ink-dim);
+    text-transform:uppercase;
+    opacity:0;
+    transition:opacity 0.15s ease;
+    pointer-events:none;
+  }
+  .pause-tag.show{ opacity:1; }
+
+  .touch-controls{
+    display:none;
+    width:min(92vw, 320px);
+    grid-template-columns:repeat(3, 64px);
+    grid-template-rows:repeat(3, 64px);
+    gap:8px;
+    justify-content:center;
+  }
+  .touch-controls button{
+    appearance:none;
+    background:var(--panel);
+    border:1px solid var(--panel-border);
+    color:var(--accent);
+    border-radius:10px;
+    font-size:20px;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    user-select:none;
+  }
+  .touch-controls button:active{
+    background:rgba(95,247,208,0.15);
+  }
+  .tc-up{ grid-column:2; grid-row:1; }
+  .tc-left{ grid-column:1; grid-row:2; }
+  .tc-pause{ grid-column:2; grid-row:2; color:var(--ink-dim); font-size:14px; }
+  .tc-right{ grid-column:3; grid-row:2; }
+  .tc-down{ grid-column:2; grid-row:3; }
+
+  @media (hover:none) and (pointer:coarse){
+    .touch-controls{ display:grid; }
+    .kbd-row{ display:none; }
+  }
+
+  .sound-toggle{
+    appearance:none;
+    background:transparent;
+    border:1px solid var(--panel-border);
+    color:var(--ink-dim);
+    border-radius:6px;
+    width:30px;
+    height:30px;
+    font-size:14px;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    cursor:pointer;
+    align-self:flex-end;
+    margin-bottom:1px;
+  }
+  .sound-toggle:hover{ border-color:var(--accent); color:var(--accent); }
+  .sound-toggle.muted{ color:var(--ink-dim); opacity:0.5; }
+
+  .footer-hint{
+    color:var(--ink-dim);
+    font-size:11px;
+    letter-spacing:0.08em;
+    opacity:0.7;
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <div class="hud">
+    <div class="title">CIRCUIT <span>//</span> SNAKE</div>
+    <div style="display:flex; gap:22px;">
+      <div class="stat-block">
+        <div>score</div>
+        <div class="num" id="scoreNum">0</div>
+      </div>
+      <div class="stat-block">
+        <div>best</div>
+        <div class="num best" id="bestNum">0</div>
+      </div>
+      <button class="sound-toggle" id="soundToggle" aria-label="toggle sound">🔊</button>
+    </div>
+  </div>
+
+  <div class="board-frame" id="boardFrame">
+    <canvas id="board"></canvas>
+    <div class="pause-tag" id="pauseTag">paused</div>
+
+    <div class="overlay" id="startOverlay">
+      <h1>circuit <span>//</span> snake</h1>
+      <p>Navigate the loop. Collect nodes to grow. Don't cross your own trace, and don't hit the wall.</p>
+      <button class="btn" id="startBtn">Start</button>
+      <div class="kbd-row">
+        <span class="kbd">↑</span><span class="kbd">↓</span><span class="kbd">←</span><span class="kbd">→</span>
+        <span class="kbd">WASD</span><span class="kbd">SPACE pause</span>
+      </div>
+    </div>
+
+    <div class="overlay hidden" id="endOverlay">
+      <h1>connection <span>lost</span></h1>
+      <div class="score-line">final score <b id="finalScore">0</b></div>
+      <div class="score-line" id="newBestLine" style="display:none; color:var(--accent);">new best</div>
+      <button class="btn" id="retryBtn">Play again</button>
+    </div>
+  </div>
+
+  <div class="touch-controls" id="touchControls">
+    <button class="tc-up" data-dir="up" aria-label="up">▲</button>
+    <button class="tc-left" data-dir="left" aria-label="left">◀</button>
+    <button class="tc-pause" id="tcPause" aria-label="pause">⏸</button>
+    <button class="tc-right" data-dir="right" aria-label="right">▶</button>
+    <button class="tc-down" data-dir="down" aria-label="down">▼</button>
+  </div>
+
+  <div class="footer-hint">space to pause &nbsp;·&nbsp; swipe or use pad on mobile</div>
+
+</div>
+
+<script>
+(function(){
+  const canvas = document.getElementById('board');
+  const ctx = canvas.getContext('2d');
+  const boardFrame = document.getElementById('boardFrame');
+  const scoreNum = document.getElementById('scoreNum');
+  const bestNum = document.getElementById('bestNum');
+  const startOverlay = document.getElementById('startOverlay');
+  const endOverlay = document.getElementById('endOverlay');
+  const startBtn = document.getElementById('startBtn');
+  const retryBtn = document.getElementById('retryBtn');
+  const finalScoreEl = document.getElementById('finalScore');
+  const newBestLine = document.getElementById('newBestLine');
+  const pauseTag = document.getElementById('pauseTag');
+  const touchControls = document.getElementById('touchControls');
+  const tcPause = document.getElementById('tcPause');
+  const soundToggle = document.getElementById('soundToggle');
+
+  const GRID = 22;
+  let cell = 0;
+  let dpr = Math.max(1, window.devicePixelRatio || 1);
+
+  const STORAGE_KEY = 'circuit-snake-best';
+  let best = 0;
+  try { best = parseInt(localStorage.getItem(STORAGE_KEY) || '0', 10) || 0; } catch(e) { best = 0; }
+  bestNum.textContent = best;
+
+  // Initialize with safe, real values (never `undefined`) so any draw() call
+  // that happens to run before resetGame() — e.g. the very first resizeCanvas()
+  // on page load — can never throw trying to read .forEach on an undefined
+  // snake/particles array or a missing food object. This was a confirmed bug:
+  // draw() ran once during initial setup before resetGame() had populated
+  // these, throwing "Cannot read properties of undefined (reading 'forEach')".
+  let snake = [], dir = {x:1,y:0}, nextDir = {x:1,y:0}, food = null, score = 0,
+      running = false, paused = false, gameOver = false, tickMs, lastTick = 0,
+      rafId = null, particles = [];
+
+  const BASE_TICK = 130;
+  const MIN_TICK = 62;
+
+  // ── Sound engine ──────────────────────────────────────────────────
+  // All sound effects are synthesized in real time with the Web Audio
+  // API (oscillator + gain envelope) rather than loaded from audio
+  // files, so the game stays a single self-contained HTML file with
+  // classic 8-bit / arcade-style "blip" tones.
+  const SOUND_KEY = 'circuit-snake-muted';
+  let muted = false;
+  try { muted = localStorage.getItem(SOUND_KEY) === '1'; } catch(e) { muted = false; }
+  let audioCtx = null;
+
+  function ensureAudio(){
+    try{
+      if(!audioCtx){
+        const AC = window.AudioContext || window.webkitAudioContext;
+        if(AC) audioCtx = new AC();
+      }
+      if(audioCtx && audioCtx.state === 'suspended') audioCtx.resume().catch(()=>{});
+    }catch(e){
+      audioCtx = null;
+    }
+  }
+
+  // Play a single tone: frequency in Hz, duration in seconds, waveform type,
+  // and peak volume (0-1). A short attack/decay envelope avoids audio "clicks".
+  // Wrapped in try/catch: audio is a nice-to-have, and must never be able to
+  // throw and interrupt the render loop (which previously caused frozen
+  // frames / missing food right after eating).
+  function playTone(freq, duration, type, volume, delay){
+    if(muted || !audioCtx) return;
+    try{
+      const t0 = audioCtx.currentTime + (delay || 0);
+      const osc = audioCtx.createOscillator();
+      const gain = audioCtx.createGain();
+      osc.type = type;
+      osc.frequency.setValueAtTime(freq, t0);
+      gain.gain.setValueAtTime(0, t0);
+      gain.gain.linearRampToValueAtTime(volume, t0 + 0.008);
+      gain.gain.exponentialRampToValueAtTime(0.0001, t0 + duration);
+      osc.connect(gain);
+      gain.connect(audioCtx.destination);
+      osc.start(t0);
+      osc.stop(t0 + duration + 0.02);
+    }catch(e){
+      // Swallow any audio errors — sound should never be able to break gameplay.
+    }
+  }
+
+  // Subtle tick on every snake movement — kept available but not used by
+  // default (calling it on every single tick caused audio-node churn that
+  // was adding noticeable lag at higher speeds).
+  function sfxMove(){ playTone(220, 0.03, 'square', 0.035); }
+  // Bright two-note "blip" when food is eaten.
+  function sfxEat(){
+    playTone(660, 0.07, 'square', 0.09);
+    playTone(880, 0.09, 'square', 0.09, 0.06);
+  }
+  // Rising chirp when a new game starts.
+  function sfxStart(){
+    playTone(392, 0.08, 'triangle', 0.08);
+    playTone(523, 0.08, 'triangle', 0.08, 0.09);
+    playTone(659, 0.12, 'triangle', 0.08, 0.18);
+  }
+  // Descending "power-down" sequence on game over.
+  function sfxGameOver(){
+    playTone(300, 0.16, 'sawtooth', 0.09);
+    playTone(220, 0.16, 'sawtooth', 0.09, 0.14);
+    playTone(140, 0.28, 'sawtooth', 0.09, 0.28);
+  }
+
+  function setMuted(value){
+    muted = value;
+    soundToggle.textContent = muted ? '🔇' : '🔊';
+    soundToggle.classList.toggle('muted', muted);
+    try{ localStorage.setItem(SOUND_KEY, muted ? '1' : '0'); }catch(e){}
+  }
+  setMuted(muted);
+
+  soundToggle.addEventListener('click', ()=>{
+    try{ ensureAudio(); }catch(e){}
+    setMuted(!muted);
+  });
+
+  // Performance caches: grid lines never change shape (only size), and the
+  // food glow gradient only needs to be recomputed when the food actually
+  // moves to a new cell — not on every single animation frame. Recreating a
+  // gradient object and stroking ~44 grid lines 60 times a second is wasted
+  // work that gets proportionally heavier as the snake grows (more segments
+  // to draw per frame too), and on slower devices/GPUs that extra per-frame
+  // cost can cause dropped frames — which can look exactly like the food
+  // "flickering" or vanishing, especially once the snake is longer.
+  const gridCanvas = document.createElement('canvas');
+  const gridCtx = gridCanvas.getContext('2d');
+  let cachedFoodGradient = null;
+  let cachedFoodKey = '';
+
+  function buildGridCache(pixelSize){
+    gridCanvas.width = pixelSize * dpr;
+    gridCanvas.height = pixelSize * dpr;
+    gridCtx.setTransform(dpr,0,0,dpr,0,0);
+    gridCtx.clearRect(0,0,pixelSize,pixelSize);
+    gridCtx.strokeStyle = 'rgba(255,255,255,0.035)';
+    gridCtx.lineWidth = 1;
+    for(let i=1;i<GRID;i++){
+      gridCtx.beginPath();
+      gridCtx.moveTo(i*cell+0.5, 0);
+      gridCtx.lineTo(i*cell+0.5, pixelSize);
+      gridCtx.stroke();
+      gridCtx.beginPath();
+      gridCtx.moveTo(0, i*cell+0.5);
+      gridCtx.lineTo(pixelSize, i*cell+0.5);
+      gridCtx.stroke();
+    }
+  }
+
+  function getFoodGradient(cx, cy){
+    const key = food.x + ',' + food.y + ',' + cell;
+    if(cachedFoodKey !== key){
+      const grad = ctx.createRadialGradient(cx,cy,0,cx,cy,cell*0.9);
+      grad.addColorStop(0, 'rgba(255,155,138,0.55)');
+      grad.addColorStop(1, 'rgba(255,155,138,0)');
+      cachedFoodGradient = grad;
+      cachedFoodKey = key;
+    }
+    return cachedFoodGradient;
+  }
+
+  function resizeCanvas(){
+    const rect = boardFrame.getBoundingClientRect();
+    const size = Math.floor(rect.width);
+    cell = Math.floor(size / GRID);
+    const pixelSize = cell * GRID;
+    canvas.width = pixelSize * dpr;
+    canvas.height = pixelSize * dpr;
+    canvas.style.width = pixelSize + 'px';
+    canvas.style.height = pixelSize + 'px';
+    ctx.setTransform(dpr,0,0,dpr,0,0);
+    buildGridCache(pixelSize);
+    draw();
+  }
+
+  function resetGame(){
+    const mid = Math.floor(GRID/2);
+    snake = [
+      {x:mid-1,y:mid}, {x:mid-2,y:mid}, {x:mid-3,y:mid}
+    ];
+    dir = {x:1,y:0};
+    nextDir = {x:1,y:0};
+    score = 0;
+    tickMs = BASE_TICK;
+    paused = false;
+    gameOver = false;
+    particles = [];
+    placeFood();
+    scoreNum.textContent = '0';
+    pauseTag.classList.remove('show');
+  }
+
+  function placeFood(){
+    let valid = false;
+    let fx, fy;
+    while(!valid){
+      fx = Math.floor(Math.random()*GRID);
+      fy = Math.floor(Math.random()*GRID);
+      valid = !snake.some(s => s.x===fx && s.y===fy);
+    }
+    food = {x:fx, y:fy, pulse:0};
+  }
+
+  function dirsOpposite(a,b){
+    return a.x === -b.x && a.y === -b.y;
+  }
+
+  function setDirection(nx, ny){
+    const candidate = {x:nx, y:ny};
+    if(dirsOpposite(candidate, dir)) return;
+    nextDir = candidate;
+  }
+
+  const keyMap = {
+    ArrowUp:[0,-1], ArrowDown:[0,1], ArrowLeft:[-1,0], ArrowRight:[1,0],
+    w:[0,-1], s:[0,1], a:[-1,0], d:[1,0],
+    W:[0,-1], S:[0,1], A:[-1,0], D:[1,0]
+  };
+
+  window.addEventListener('keydown', (e)=>{
+    if(e.key === ' '){
+      e.preventDefault();
+      if(running && !gameOver) togglePause();
+      return;
+    }
+    const mapped = keyMap[e.key];
+    if(mapped){
+      e.preventDefault();
+      if(!running || gameOver) return;
+      if(paused) return;
+      setDirection(mapped[0], mapped[1]);
+    }
+  }, {passive:false});
+
+  document.querySelectorAll('.touch-controls [data-dir]').forEach(btn=>{
+    btn.addEventListener('click', ()=>{
+      if(!running || gameOver || paused) return;
+      const d = btn.dataset.dir;
+      if(d==='up') setDirection(0,-1);
+      if(d==='down') setDirection(0,1);
+      if(d==='left') setDirection(-1,0);
+      if(d==='right') setDirection(1,0);
+    });
+  });
+  tcPause.addEventListener('click', ()=>{ if(running && !gameOver) togglePause(); });
+
+  let touchStart = null;
+  boardFrame.addEventListener('touchstart', (e)=>{
+    const t = e.touches[0];
+    touchStart = {x:t.clientX, y:t.clientY};
+  }, {passive:true});
+  boardFrame.addEventListener('touchend', (e)=>{
+    if(!touchStart) return;
+    const t = e.changedTouches[0];
+    const dx = t.clientX - touchStart.x;
+    const dy = t.clientY - touchStart.y;
+    if(Math.abs(dx) < 24 && Math.abs(dy) < 24){ touchStart=null; return; }
+    if(!running || gameOver || paused){ touchStart=null; return; }
+    if(Math.abs(dx) > Math.abs(dy)){
+      setDirection(dx>0?1:-1, 0);
+    } else {
+      setDirection(0, dy>0?1:-1);
+    }
+    touchStart = null;
+  }, {passive:true});
+
+  function togglePause(){
+    paused = !paused;
+    pauseTag.classList.toggle('show', paused);
+    tcPause.textContent = paused ? '▶' : '⏸';
+    if(!paused){ lastTick = performance.now(); loop(lastTick); }
+  }
+
+  function step(){
+    dir = nextDir;
+    const head = snake[0];
+    const newHead = {x: head.x + dir.x, y: head.y + dir.y};
+
+    if(newHead.x < 0 || newHead.x >= GRID || newHead.y < 0 || newHead.y >= GRID){
+      return endGame();
+    }
+
+    const ateFood = !!food && newHead.x === food.x && newHead.y === food.y;
+    // When the snake is NOT eating, its tail is about to move away this same
+    // tick — so the cell the tail currently sits on is safe to enter and must
+    // be excluded from the collision check. (Previously this checked the full
+    // body including the tail, which could falsely end the game.)
+    const bodyToCheck = ateFood ? snake : snake.slice(0, -1);
+    if(bodyToCheck.some(s => s.x===newHead.x && s.y===newHead.y)){
+      return endGame();
+    }
+
+    snake.unshift(newHead);
+
+    if(ateFood){
+      // Score, particles, next food, and speed are all resolved FIRST —
+      // sound is purely cosmetic and is tried last, wrapped so it can never
+      // interfere with (or block) the actual game state update above.
+      score += 10;
+      scoreNum.textContent = score;
+      spawnParticles(food.x, food.y);
+      placeFood();
+      tickMs = Math.max(MIN_TICK, BASE_TICK - snake.length*2.2);
+      try{ sfxEat(); }catch(e){}
+    } else {
+      snake.pop();
+    }
+  }
+
+  function spawnParticles(gx, gy){
+    for(let i=0;i<10;i++){
+      const angle = (Math.PI*2*i)/10;
+      particles.push({
+        x: gx + 0.5, y: gy + 0.5,
+        vx: Math.cos(angle)*0.06, vy: Math.sin(angle)*0.06,
+        life: 1
+      });
+    }
+  }
+
+  function updateParticles(){
+    particles.forEach(p=>{
+      p.x += p.vx; p.y += p.vy; p.life -= 0.045;
+    });
+    particles = particles.filter(p=>p.life>0);
+  }
+
+  function endGame(){
+    gameOver = true;
+    running = false;
+    try{ sfxGameOver(); }catch(e){}
+    finalScoreEl.textContent = score;
+    if(score > best){
+      best = score;
+      bestNum.textContent = best;
+      try{ localStorage.setItem(STORAGE_KEY, String(best)); }catch(e){}
+      newBestLine.style.display = 'block';
+    } else {
+      newBestLine.style.display = 'none';
+    }
+    endOverlay.classList.remove('hidden');
+  }
+
+  function draw(){
+    const size = cell*GRID;
+    ctx.clearRect(0,0,size,size);
+    ctx.drawImage(gridCanvas, 0, 0, size, size);
+
+    if(food){
+      const pulse = 0.5 + 0.5*Math.sin(performance.now()/220);
+      const cx = food.x*cell + cell/2;
+      const cy = food.y*cell + cell/2;
+      const r = cell*0.32 + pulse*1.5;
+      ctx.fillStyle = getFoodGradient(cx, cy);
+      ctx.beginPath();
+      ctx.arc(cx, cy, cell*0.9, 0, Math.PI*2);
+      ctx.fill();
+
+      ctx.fillStyle = '#ff6b5b';
+      ctx.beginPath();
+      ctx.arc(cx, cy, r, 0, Math.PI*2);
+      ctx.fill();
+    }
+
+    snake.forEach((seg, i)=>{
+      const x = seg.x*cell, y = seg.y*cell;
+      const isHead = i===0;
+      const pad = isHead ? 1 : 2;
+      const r = isHead ? 6 : 4;
+      if(isHead){
+        // Cheap glow: a larger, low-opacity solid shape drawn behind the
+        // head. Avoids ctx.shadowBlur, which forces a real blur pass every
+        // frame and is one of the most expensive Canvas2D operations —
+        // costly enough, repeated 60x/sec, to contribute to dropped frames
+        // once the board has more to draw (a longer snake, later in a run).
+        ctx.fillStyle = 'rgba(95,247,208,0.30)';
+        roundRect(x+pad-2, y+pad-2, cell-pad*2+4, cell-pad*2+4, r+3);
+        ctx.fill();
+      }
+      ctx.fillStyle = isHead ? '#5ff7d0' : '#2fd7ae';
+      roundRect(x+pad, y+pad, cell-pad*2, cell-pad*2, r);
+      ctx.fill();
+    });
+
+    particles.forEach(p=>{
+      ctx.fillStyle = `rgba(255,155,138,${Math.max(0,p.life)})`;
+      ctx.beginPath();
+      ctx.arc(p.x*cell, p.y*cell, 2.4, 0, Math.PI*2);
+      ctx.fill();
+    });
+  }
+
+  function roundRect(x,y,w,h,r){
+    ctx.beginPath();
+    ctx.moveTo(x+r,y);
+    ctx.arcTo(x+w,y,x+w,y+h,r);
+    ctx.arcTo(x+w,y+h,x,y+h,r);
+    ctx.arcTo(x,y+h,x,y,r);
+    ctx.arcTo(x,y,x+w,y,r);
+    ctx.closePath();
+  }
+
+  function loop(ts){
+    if(!running || paused || gameOver) return;
+    if(!lastTick) lastTick = ts;
+    const elapsed = ts - lastTick;
+    if(elapsed >= tickMs){
+      lastTick = ts;
+      try{
+        step();
+      }catch(e){
+        // A single bad tick should never permanently freeze the game —
+        // log it and keep the render loop alive.
+        console.error('Snake step() error:', e);
+      }
+    }
+    updateParticles();
+    draw();
+    if(!gameOver) rafId = requestAnimationFrame(loop);
+  }
+
+  function startGame(){
+    // Game state must always initialize successfully — sound is attempted
+    // only after resetGame() has already run, and is fully wrapped so any
+    // audio failure (e.g. blocked autoplay, sandboxed environment) can never
+    // prevent the game — or food — from appearing.
+    resetGame();
+    running = true;
+    startOverlay.classList.add('hidden');
+    endOverlay.classList.add('hidden');
+    lastTick = performance.now();
+    rafId = requestAnimationFrame(loop);
+    try{ ensureAudio(); sfxStart(); }catch(e){}
+  }
+
+  startBtn.addEventListener('click', startGame);
+  retryBtn.addEventListener('click', startGame);
+
+  window.addEventListener('resize', resizeCanvas);
+  resizeCanvas();
+  resetGame();
+  draw();
+})();
+</script>
+</body>
+</html>
