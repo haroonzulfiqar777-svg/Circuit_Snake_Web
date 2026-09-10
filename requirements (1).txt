@@ -1,0 +1,11 @@
+# No dependencies required.
+#
+# This project (snake-game.html) is a single self-contained HTML file
+# using only HTML5 Canvas, vanilla JavaScript, and CSS — no external
+# libraries, frameworks, or packages are used.
+#
+# There is nothing to install. Just open snake-game.html in a browser.
+#
+# (This file is included only for consistency with the Python version
+# of this project, which does have real dependencies — see the
+# python-snake-game repo's requirements.txt for that one.)
